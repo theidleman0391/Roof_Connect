@@ -76,7 +76,7 @@ const Login: React.FC = () => {
                     <div className="bg-primary/10 p-2 sm:p-2.5 rounded-xl border border-primary/20">
                         <span className="material-symbols-outlined text-primary text-3xl sm:text-4xl">roofing</span>
                     </div>
-                    <h1 className="text-xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">CCDOCS</h1>
+                    <h1 className="text-xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">Roof Connect</h1>
                     <p className="text-xs sm:text-sm text-slate-500 font-medium tracking-wide uppercase">Roofing CRM</p>
                 </div>
 
