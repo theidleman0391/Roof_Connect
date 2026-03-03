@@ -352,10 +352,11 @@ const ActiveScript: React.FC = () => {
     const handleDelete = async (id: string, type: 'script' | 'rebuttal') => {
         if (type === 'script') {
             setScriptSteps(scriptSteps.filter(s => s.id !== id));
-            if (user) await supabase.from('script_steps').delete().eq('id', id);
+            // Security: always scope deletes to the current user's records
+            if (user) await supabase.from('script_steps').delete().eq('id', id).eq('user_id', user.id);
         } else {
             setRebuttals(rebuttals.filter(r => r.id !== id));
-            if (user) await supabase.from('rebuttals').delete().eq('id', id);
+            if (user) await supabase.from('rebuttals').delete().eq('id', id).eq('user_id', user.id);
         }
     };
 
@@ -462,8 +463,20 @@ Requirements:
     // --- Renderers ---
 
     const renderScriptContent = (text: string) => {
-        // Simple highlighter for demo purposes - in real app use a sanitizer
-        return { __html: text };
+        // Sanitize: strip all HTML except allowed <span class="highlight">...</span>
+        // Step 1: Escape all HTML entities first
+        const escaped = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#x27;');
+        // Step 2: Re-allow only the specific highlight span pattern (after escaping it was encoded, restore it)
+        const sanitized = escaped.replace(
+            /&lt;span class=&quot;highlight&quot;&gt;(.*?)&lt;\/span&gt;/g,
+            '<span class="highlight">$1</span>'
+        );
+        return { __html: sanitized };
     };
 
     return (

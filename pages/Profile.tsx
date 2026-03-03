@@ -23,9 +23,27 @@ const Profile: React.FC = () => {
             }
 
             const file = event.target.files[0];
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${user?.id}-${Math.random()}.${fileExt}`;
-            const filePath = `${fileName}`;
+
+            // Security: validate MIME type and extension
+            const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+            const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+            const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+
+            if (!ALLOWED_MIME_TYPES.includes(file.type) || !ALLOWED_EXTENSIONS.includes(fileExt)) {
+                alert('Only image files (JPG, PNG, GIF, WebP) are allowed.');
+                return;
+            }
+
+            // Security: limit file size to 5MB
+            const MAX_SIZE = 5 * 1024 * 1024;
+            if (file.size > MAX_SIZE) {
+                alert('File size must be under 5MB.');
+                return;
+            }
+
+            // Use a safe, predictable filename (no user-controlled path segments)
+            const fileName = `avatar-${user?.id}-${Date.now()}.${fileExt}`;
+            const filePath = fileName;
 
             // Upload
             const { error: uploadError } = await supabase.storage

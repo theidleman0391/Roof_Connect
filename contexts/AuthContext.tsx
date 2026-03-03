@@ -84,13 +84,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (!user) return;
 
         try {
-            const updates = {
-                full_name: data.name,
-                avatar_url: data.avatar,
-                // agent_id and role might be restricted in real app but allowing here
-                agent_id: data.agentId,
-                role: data.role
-            };
+            // Security: only allow safe fields to be updated by the user themselves.
+            // Role and agentId should only be changed server-side by an Admin.
+            const updates: Record<string, any> = {};
+            if (data.name !== undefined) updates.full_name = data.name;
+            if (data.avatar !== undefined) updates.avatar_url = data.avatar;
 
             const { error } = await supabase
                 .from('profiles')
@@ -99,7 +97,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             if (error) throw error;
 
-            setUser(prev => prev ? { ...prev, ...data } : null);
+            // Only reflect the safe fields locally
+            setUser(prev => prev ? { ...prev, name: data.name ?? prev.name, avatar: data.avatar ?? prev.avatar } : null);
         } catch (error) {
             console.error('Error updating profile:', error);
         }

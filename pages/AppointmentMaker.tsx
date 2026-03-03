@@ -14,23 +14,23 @@ const HOLIDAY_BLOCKS: string[] = [
 // --- Default Schema Definition ---
 const DEFAULT_SCHEMA: FormField[] = [
     { id: 'homeOwner', type: 'text', label: 'Home Owner', required: true, prefix: 'Home Owner: ', suffix: '\n', placeholder: 'John Doe' },
-    { id: 'roofAge', type: 'slider', label: 'Roof Age', min: 0, max: 50, step: 1, prefix: 'Roof Age: ', suffix: ' years\n' },
-    { id: 'roofType', type: 'select', label: 'Roof Type', options: ['Shingles', 'Metal', 'Tile', 'Flat', 'Other'], prefix: 'Roof Type: ', suffix: '\n' },
-    { id: 'insuranceName', type: 'select', label: 'Insurance Name', options: ['All State', 'State Farm', 'USAA', 'Geico', 'Progressive', 'Farmers', 'Travelers', "Don't Know", 'Other'], prefix: 'Insurance: ', suffix: '\n' },
-    { id: 'insuranceOther', type: 'text', label: 'Other Insurance Name', showWhen: { fieldId: 'insuranceName', value: 'Other' }, prefix: 'Insurance (Other): ', suffix: '\n' },
-    { id: 'roofCondition', type: 'select', label: 'Roof Condition', options: ['Unknown', 'Damaged'], prefix: 'Condition: ', suffix: '\n' },
-    { id: 'damageDescription', type: 'textarea', label: 'Damage Description', showWhen: { fieldId: 'roofCondition', value: 'Damaged' }, prefix: 'Damage: ', suffix: '\n' },
-    { id: 'squareFootage', type: 'number', label: 'Square Footage', prefix: 'Sq Ft: ', suffix: '\n' },
-    { id: 'emailOption', type: 'select', label: 'Email Option', options: ['Has Email', 'Does Not Apply'], prefix: 'Email Status: ', suffix: '\n' },
-    { id: 'email', type: 'email', label: 'Email Address', showWhen: { fieldId: 'emailOption', value: 'Has Email' }, prefix: 'Email: ', suffix: '\n' },
-    { id: 'phoneNumber', type: 'tel', label: 'Phone Number', prefix: 'Phone: ', suffix: '\n', placeholder: '(555) 000-0000' },
-    { id: 'address', type: 'text', label: 'Address', prefix: 'Address: ', suffix: '\n' },
-    { id: 'state', type: 'select', label: 'Property State', options: ['GA', 'TN', 'AL', 'SC'], required: true, prefix: 'State: ', suffix: '\n' },
-    { id: 'engagementLevel', type: 'select', label: 'Engagement Level', options: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'], prefix: 'Engagement: ', suffix: '/10\n' },
+    { id: 'roofAge', type: 'slider', label: 'Roof Age', required: true, min: 0, max: 50, step: 1, prefix: 'Roof Age: ', suffix: ' years\n' },
+    { id: 'roofType', type: 'select', label: 'Roof Type', required: true, options: ['Shingles', 'Metal', 'Tile', 'Flat', 'Other'], prefix: 'Roof Type: ', suffix: '\n' },
+    { id: 'insuranceName', type: 'select', label: 'Insurance Name', required: true, options: ['All State', 'State Farm', 'USAA', 'Geico', 'Progressive', 'Farmers', 'Travelers', "Don't Know", 'Other'], prefix: 'Insurance: ', suffix: '\n' },
+    { id: 'insuranceOther', type: 'text', label: 'Other Insurance Name', required: true, showWhen: { fieldId: 'insuranceName', value: 'Other' }, prefix: 'Insurance (Other): ', suffix: '\n' },
+    { id: 'roofCondition', type: 'select', label: 'Roof Condition', required: true, options: ['Unknown', 'Damaged'], prefix: 'Condition: ', suffix: '\n' },
+    { id: 'damageDescription', type: 'textarea', label: 'Damage Description', required: true, showWhen: { fieldId: 'roofCondition', value: 'Damaged' }, prefix: 'Damage: ', suffix: '\n' },
+    { id: 'squareFootage', type: 'number', label: 'Square Footage', required: true, prefix: 'Sq Ft: ', suffix: '\n' },
+    { id: 'emailOption', type: 'select', label: 'Email Option', required: true, options: ['Has Email', 'Does Not Apply'], prefix: 'Email Status: ', suffix: '\n' },
+    { id: 'email', type: 'email', label: 'Email Address', required: true, showWhen: { fieldId: 'emailOption', value: 'Has Email' }, prefix: 'Email: ', suffix: '\n' },
+    { id: 'phoneNumber', type: 'tel', label: 'Phone Number', required: true, prefix: 'Phone: ', suffix: '\n', placeholder: '(555) 000-0000' },
+    { id: 'address', type: 'text', label: 'Address', required: true, prefix: 'Address: ', suffix: '\n' },
+    { id: 'state', type: 'select', label: 'Property State', required: true, options: ['GA', 'TN', 'AL', 'SC'], prefix: 'State: ', suffix: '\n' },
+    { id: 'engagementLevel', type: 'select', label: 'Engagement Level', required: true, options: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'], prefix: 'Engagement: ', suffix: '/10\n' },
     { id: 'appointmentDate', type: 'date', label: 'Appointment Date', required: true, prefix: 'Date: ', suffix: '\n' },
-    { id: 'appointmentTime', type: 'select', label: 'Appointment Time', options: [], required: true, prefix: 'Time: ', suffix: '\n' }, // Options handled dynamically
-    { id: 'notes', type: 'textarea', label: 'Notes', prefix: 'Notes: ', suffix: '\n' },
-    { id: 'googleMaps', type: 'url', label: 'Google Maps Link', prefix: 'Map: ', suffix: '\n' },
+    { id: 'appointmentTime', type: 'select', label: 'Appointment Time', required: true, options: [], prefix: 'Time: ', suffix: '\n' }, // Options handled dynamically
+    { id: 'notes', type: 'textarea', label: 'Notes', required: true, prefix: 'Notes: ', suffix: '\n' },
+    { id: 'googleMaps', type: 'url', label: 'Google Maps Link', required: true, prefix: 'Map: ', suffix: '\n' },
 ];
 
 // --- Helper Hooks ---
@@ -212,7 +212,13 @@ const AppointmentMaker: React.FC = () => {
 
         schema.forEach(field => {
             if (isFieldVisible(field, formData)) {
-                if (field.required && !formData[field.id]) {
+                let val = formData[field.id];
+                if (field.type === 'slider' && val === undefined) {
+                    val = 0;
+                }
+
+                const isEmpty = val === undefined || val === null || val === '';
+                if (field.required && isEmpty) {
                     newErrors[field.id] = true;
                     isValid = false;
                 }
@@ -277,7 +283,7 @@ const AppointmentMaker: React.FC = () => {
     const handleDelete = async (id: string) => {
         // Store the deleted item in case we need to restore it
         const deletedAppt = appointments.find(a => a.id === id);
-        
+
         // Optimistic update - remove from UI immediately
         setAppointments(appointments.filter(a => a.id !== id));
 
