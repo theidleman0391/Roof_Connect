@@ -12,8 +12,7 @@ export interface SidebarProps {
 
 // --- Dynamic Form Engine Types ---
 
-export type FieldType = 'text' | 'number' | 'tel' | 'email' | 'select' | 'textarea' | 'slider' | 'date' | 'url';
-
+export type FieldType = 'text' | 'number' | 'tel' | 'email' | 'select' | 'multiselect' | 'textarea' | 'slider' | 'date' | 'url';
 export interface ConditionalLogic {
     fieldId: string;
     value: string | number | boolean;

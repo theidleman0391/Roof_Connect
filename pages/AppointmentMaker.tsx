@@ -18,8 +18,23 @@ const DEFAULT_SCHEMA: FormField[] = [
     { id: 'roofType', type: 'select', label: 'Roof Type', required: true, options: ['Shingles', 'Metal', 'Tile', 'Flat', 'Other'], prefix: 'Roof Type: ', suffix: '\n' },
     { id: 'insuranceName', type: 'select', label: 'Insurance Name', required: true, options: ['All State', 'State Farm', 'USAA', 'Geico', 'Progressive', 'Farmers', 'Travelers', "Don't Know", 'Other'], prefix: 'Insurance: ', suffix: '\n' },
     { id: 'insuranceOther', type: 'text', label: 'Other Insurance Name', required: true, showWhen: { fieldId: 'insuranceName', value: 'Other' }, prefix: 'Insurance (Other): ', suffix: '\n' },
-    { id: 'roofCondition', type: 'select', label: 'Roof Condition', required: true, options: ['Unknown', 'Damaged'], prefix: 'Condition: ', suffix: '\n' },
-    { id: 'damageDescription', type: 'textarea', label: 'Damage Description', required: true, showWhen: { fieldId: 'roofCondition', value: 'Damaged' }, prefix: 'Damage: ', suffix: '\n' },
+    { id: 'roofCondition', type: 'multiselect', label: 'Roof Condition', required: true, options: [
+        'Hail damage (dents, cracks, granule loss)',
+        'Wind damage (missing, lifted, or torn shingles)',
+        'Water damage (leaks, soft spots, pooling)',
+        'Ice/snow damage (dams, heavy load sagging)',
+        'Moss/algae growth (lifting shingles, trapped moisture)',
+        'UV/heat damage (warping, blistering)',
+        'Tree/debris damage (punctures, scratches)',
+        'Missing/curled/cracked shingles',
+        'Flashing damage (loose, rusted around vents/chimneys)',
+        'Pest damage (holes from animals/insects)',
+        'Granule loss (bare spots exposing underlayment)',
+        'Rotten decking (sagging, structural weakness)',
+        'Unknown',
+        'Other'
+    ], prefix: 'Condition: ', suffix: '\n' },
+    { id: 'damageDescription', type: 'textarea', label: 'Other Damage Description', required: true, showWhen: { fieldId: 'roofCondition', value: 'Other' }, prefix: 'Other Damage: ', suffix: '\n' },
     { id: 'squareFootage', type: 'number', label: 'Square Footage', required: true, prefix: 'Sq Ft: ', suffix: '\n' },
     { id: 'emailOption', type: 'select', label: 'Email Option', required: true, options: ['Has Email', 'Does Not Apply'], prefix: 'Email Status: ', suffix: '\n' },
     { id: 'email', type: 'email', label: 'Email Address', required: true, showWhen: { fieldId: 'emailOption', value: 'Has Email' }, prefix: 'Email: ', suffix: '\n' },
@@ -34,8 +49,85 @@ const DEFAULT_SCHEMA: FormField[] = [
 ];
 
 // --- Helper Hooks ---
-// --- Helper Hooks ---
 // (Supabase used instead of useLocalStorage)
+
+const MultiSelectDropdown: React.FC<{
+    options: string[],
+    value: string[],
+    onChange: (val: string[]) => void,
+    placeholder?: string,
+    error?: boolean
+}> = ({ options, value, onChange, placeholder = 'Select...', error }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const toggleOption = (opt: string) => {
+        if (value.includes(opt)) {
+            onChange(value.filter(v => v !== opt));
+        } else {
+            onChange([...value, opt]);
+        }
+    };
+
+    return (
+        <div className="relative" ref={dropdownRef}>
+            <div 
+                className={`w-full min-h-[42px] rounded-lg border bg-white dark:bg-gray-800 text-sm flex items-center justify-between p-2 cursor-pointer transition-colors ${error ? 'border-red-500 ring-1 ring-red-500 bg-red-50 dark:bg-red-900/10' : 'border-gray-300 dark:border-gray-600 hover:border-primary'}`}
+                onClick={() => setIsOpen(!isOpen)}
+            >
+                <div className="flex flex-wrap gap-1 items-center flex-1">
+                    {value.length === 0 ? (
+                        <span className="text-gray-500 dark:text-gray-400 pl-2">{placeholder}</span>
+                    ) : (
+                        value.map(v => (
+                            <span key={v} className="bg-primary/10 text-primary dark:bg-primary/20 text-xs px-2 py-1 rounded-md flex items-center gap-1">
+                                <span className="max-w-[200px] truncate">{v}</span>
+                                <span 
+                                    className="material-symbols-outlined text-[14px] cursor-pointer hover:bg-primary/20 rounded-full"
+                                    onClick={(e) => { e.stopPropagation(); toggleOption(v); }}
+                                >
+                                    close
+                                </span>
+                            </span>
+                        ))
+                    )}
+                </div>
+                <span className="material-symbols-outlined text-gray-400 pr-1">
+                    {isOpen ? 'expand_less' : 'expand_more'}
+                </span>
+            </div>
+            
+            {isOpen && (
+                <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 shadow-xl rounded-lg max-h-60 overflow-y-auto animate-[slideIn_0.1s_ease-out]">
+                    {options.map(opt => {
+                        const isSelected = value.includes(opt);
+                        return (
+                            <label key={opt} className={`flex items-center gap-3 p-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-gray-700/50 transition-colors ${isSelected ? 'bg-primary/5 dark:bg-primary/10' : ''}`}>
+                                <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleOption(opt)}
+                                    className="w-4 h-4 text-primary rounded border-slate-300 dark:border-slate-600 focus:ring-primary dark:bg-slate-700"
+                                />
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{opt}</span>
+                            </label>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+};
 
 const AppointmentMaker: React.FC = () => {
     // --- State ---
@@ -109,14 +201,20 @@ const AppointmentMaker: React.FC = () => {
 
     const isFieldVisible = (field: FormField, currentData: Record<string, any>) => {
         if (!field.showWhen) return true;
-        return currentData[field.showWhen.fieldId] === field.showWhen.value;
+        const fieldValue = currentData[field.showWhen.fieldId];
+        if (Array.isArray(fieldValue)) {
+            return fieldValue.includes(field.showWhen.value as string);
+        }
+        return fieldValue === field.showWhen.value;
     };
 
     const generateClipboardText = (data: Record<string, any>, currentSchema: FormField[]) => {
         let text = '';
         currentSchema.forEach(field => {
             if (isFieldVisible(field, data) && data[field.id]) {
-                text += `${field.prefix || ''}${data[field.id]}${field.suffix || ''}`;
+                const val = Array.isArray(data[field.id]) ? data[field.id].join(', ') : data[field.id];
+                if (Array.isArray(data[field.id]) && data[field.id].length === 0) return;
+                text += `${field.prefix || ''}${val}${field.suffix || ''}`;
             }
         });
         text += 'Did you confirm the physical address?: Yes';
@@ -217,7 +315,7 @@ const AppointmentMaker: React.FC = () => {
                     val = 0;
                 }
 
-                const isEmpty = val === undefined || val === null || val === '';
+                const isEmpty = val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0);
                 if (field.required && isEmpty) {
                     newErrors[field.id] = true;
                     isValid = false;
@@ -484,6 +582,19 @@ const AppointmentMaker: React.FC = () => {
         }
 
         switch (field.type) {
+            case 'multiselect':
+                return (
+                    <MultiSelectDropdown
+                        options={field.options || []}
+                        value={Array.isArray(value) ? value : []}
+                        onChange={(newValue) => {
+                            setFormData({ ...formData, [field.id]: newValue });
+                            if (newValue.length > 0) setErrors({ ...errors, [field.id]: false });
+                        }}
+                        placeholder="Select options..."
+                        error={error}
+                    />
+                );
             case 'select':
                 return (
                     <select
