@@ -174,6 +174,7 @@ const AppointmentMaker: React.FC = () => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingRecord, setEditingRecord] = useState<AppointmentRecord | null>(null);
+    const [isEditMode, setIsEditMode] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [errors, setErrors] = useState<Record<string, boolean>>({});
 
@@ -338,12 +339,17 @@ const AppointmentMaker: React.FC = () => {
             return;
         }
 
-        const summary = generateClipboardText(formData, schema);
-
         if (!user) {
             showToast('Please log in using Supabase to save.', 'error');
             return;
         }
+
+        if (editingRecord && isEditMode) {
+            await handleUpdateFromForm();
+            return;
+        }
+
+        const summary = generateClipboardText(formData, schema);
 
         try {
             const { data, error } = await supabase
@@ -375,6 +381,43 @@ const AppointmentMaker: React.FC = () => {
         } catch (error) {
             console.error('Save error:', error);
             showToast('Failed to save to database.', 'error');
+        }
+    };
+
+    const handleUpdateFromForm = async () => {
+        if (!editingRecord) return;
+
+        try {
+            const updatedFormData = { ...formData };
+            const updatedClipboard = generateClipboardText(updatedFormData, schema);
+
+            const { data, error } = await supabase
+                .from('appointments')
+                .update({ form_data: updatedFormData, clipboard_summary: updatedClipboard })
+                .eq('id', editingRecord.id)
+                .select();
+
+            if (error) throw error;
+
+            if (data && data.length > 0) {
+                const updatedRecord: AppointmentRecord = {
+                    id: data[0].id,
+                    createdAt: new Date(data[0].created_at).getTime(),
+                    formData: data[0].form_data,
+                    clipboardSummary: data[0].clipboard_summary
+                };
+
+                setAppointments(appointments.map(a => a.id === editingRecord.id ? updatedRecord : a));
+                setFormData({});
+                setEditingRecord(null);
+                setIsEditMode(false);
+                setIsEditModalOpen(false);
+                setErrors({});
+                showToast('Updated appointment successfully.');
+            }
+        } catch (error) {
+            console.error('UpdateFromForm error:', error);
+            showToast('Failed to update appointment.', 'error');
         }
     };
 
@@ -410,11 +453,45 @@ const AppointmentMaker: React.FC = () => {
         }
     };
 
-    const handleUpdateRecord = () => {
+    const handleUpdateRecord = async () => {
         if (!editingRecord) return;
-        setAppointments(appointments.map(a => a.id === editingRecord.id ? editingRecord : a));
-        setIsEditModalOpen(false);
-        showToast('Record updated.');
+
+        try {
+            const updatedFormData = isEditMode ? formData : editingRecord.formData;
+            const updatedClipboard = editingRecord.clipboardSummary || generateClipboardText(updatedFormData, schema);
+
+            const { data, error } = await supabase
+                .from('appointments')
+                .update({ form_data: updatedFormData, clipboard_summary: updatedClipboard })
+                .eq('id', editingRecord.id)
+                .select();
+
+            if (error) {
+                console.error('Supabase update error:', error);
+                throw error;
+            }
+
+            if (data && data.length > 0) {
+                const updatedRecord: AppointmentRecord = {
+                    id: data[0].id,
+                    createdAt: new Date(data[0].created_at).getTime(),
+                    formData: data[0].form_data,
+                    clipboardSummary: data[0].clipboard_summary
+                };
+
+                setAppointments(appointments.map(a => a.id === editingRecord.id ? updatedRecord : a));
+                setFormData({});
+                setErrors({});
+                setEditingRecord(null);
+                setIsEditMode(false);
+            }
+
+            setIsEditModalOpen(false);
+            showToast('Record updated successfully.');
+        } catch (error) {
+            console.error('Update error:', error);
+            showToast('Failed to update record.', 'error');
+        }
     };
 
     // --- Calendar Logic ---
@@ -432,8 +509,12 @@ const AppointmentMaker: React.FC = () => {
 
     const handleCalendarNav = (direction: 'prev' | 'next') => {
         const newDate = new Date(calendarViewDate);
-        if (direction === 'prev') newDate.setMonth(newDate.getMonth() - 1);
-        else newDate.setMonth(newDate.getMonth() + 1);
+        newDate.setDate(1); // Set to 1st of current month first to avoid overflow
+        if (direction === 'prev') {
+            newDate.setMonth(newDate.getMonth() - 1);
+        } else {
+            newDate.setMonth(newDate.getMonth() + 1);
+        }
         setCalendarViewDate(newDate);
     };
 
@@ -711,7 +792,7 @@ const AppointmentMaker: React.FC = () => {
                         Appointment Maker
                     </h1>
                     <div className="flex gap-3">
-                        <button onClick={() => { setFormData({}); setErrors({}); }} className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/5 rounded-lg transition-colors">
+                        <button onClick={() => { setFormData({}); setErrors({}); setEditingRecord(null); setIsEditMode(false); }} className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/5 rounded-lg transition-colors">
                             Clear Form
                         </button>
                         <button
@@ -747,7 +828,7 @@ const AppointmentMaker: React.FC = () => {
                                     className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-blue-500/30 transition-all hover:scale-[1.01] active:scale-[0.98]"
                                 >
                                     <span className="material-symbols-outlined">content_paste_go</span>
-                                    Save & Copy to Clipboard
+                                    {isEditMode ? 'Update Appointment' : 'Save & Copy to Clipboard'}
                                 </button>
                             </div>
                         </div>
@@ -788,7 +869,12 @@ const AppointmentMaker: React.FC = () => {
                                                 </p>
                                             </div>
                                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => { setEditingRecord(record); setIsEditModalOpen(true); }} className="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors" title="Edit Text">
+                                                <button onClick={() => {
+                                                    setEditingRecord(record);
+                                                    setFormData(record.formData);
+                                                    setIsEditMode(true);
+                                                    setIsEditModalOpen(true);
+                                                }} className="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors" title="Edit Text">
                                                     <span className="material-symbols-outlined text-[20px]">edit_note</span>
                                                 </button>
                                                 <button onClick={() => handleDelete(record.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Delete">
@@ -926,7 +1012,7 @@ const AppointmentMaker: React.FC = () => {
                                     <h2 className="text-xl font-bold text-slate-900 dark:text-white">Edit Clipboard Summary</h2>
                                     <p className="text-xs text-slate-500">Manually tweak the text before re-saving.</p>
                                 </div>
-                                <button onClick={() => setIsEditModalOpen(false)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                                <button onClick={() => { setIsEditModalOpen(false); setIsEditMode(false); setEditingRecord(null); setFormData({}); }} className="text-slate-400 hover:text-slate-900 dark:hover:text-white">
                                     <span className="material-symbols-outlined">close</span>
                                 </button>
                             </div>
