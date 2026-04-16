@@ -48,6 +48,23 @@ const DEFAULT_SCHEMA: FormField[] = [
     { id: 'googleMaps', type: 'url', label: 'Google Maps Link', required: true, prefix: 'Map: ', suffix: '\n' },
 ];
 
+// --- Form Layout Config ---
+const FORM_SECTIONS: Record<string, { title: string; icon: string }> = {
+    homeOwner:       { title: 'Homeowner',        icon: 'person'         },
+    roofAge:         { title: 'Property & Roof',   icon: 'home'           },
+    insuranceName:   { title: 'Insurance',         icon: 'verified_user'  },
+    squareFootage:   { title: 'Details',           icon: 'info'           },
+    appointmentDate: { title: 'Schedule',          icon: 'event'          },
+    notes:           { title: 'Notes',             icon: 'notes'          },
+};
+
+// Fields that share a row (paired consecutive fields render side-by-side)
+const HALF_WIDTH_FIELDS = new Set([
+    'squareFootage', 'emailOption',
+    'state', 'engagementLevel',
+    'appointmentDate', 'appointmentTime',
+]);
+
 // --- Helper Hooks ---
 // (Supabase used instead of useLocalStorage)
 
@@ -807,22 +824,50 @@ const AppointmentMaker: React.FC = () => {
 
                 <main className="flex-1 flex overflow-hidden">
                     {/* LEFT COLUMN: FORM ENGINE */}
-                    <div className="w-full lg:w-1/2 xl:w-5/12 overflow-y-auto custom-scrollbar p-6 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-transparent">
-                        <div className="max-w-xl mx-auto space-y-5 pb-24">
-                            {schema.map(field => {
-                                if (!isFieldVisible(field, formData)) return null;
-                                return (
-                                    <div key={field.id} className="animate-[slideIn_0.3s_ease-out]">
-                                        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex justify-between">
-                                            <span>{field.label} {field.required && <span className="text-red-500">*</span>}</span>
-                                            {errors[field.id] && <span className="text-xs text-red-500 font-bold animate-pulse">Required</span>}
-                                        </label>
-                                        {renderInput(field)}
-                                    </div>
-                                );
-                            })}
+                    <div className="w-full lg:w-1/2 xl:w-5/12 overflow-y-auto custom-scrollbar border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-transparent">
+                        <div className="max-w-lg mx-auto px-6 pt-5 pb-28">
 
-                            <div className="pt-6 sticky bottom-0 bg-gradient-to-t from-white dark:from-[#1a1d21] via-white dark:via-[#1a1d21] to-transparent pb-4">
+                            {/* Edit mode banner */}
+                            {isEditMode && (
+                                <div className="mb-4 flex items-center gap-2 bg-primary/5 border border-primary/20 text-primary rounded-xl px-4 py-2.5 text-sm font-semibold animate-[slideIn_0.2s_ease-out]">
+                                    <span className="material-symbols-outlined text-[18px]">edit</span>
+                                    Editing record — changes reflect live on the card
+                                    <button onClick={() => { setFormData({}); setEditingRecord(null); setIsEditMode(false); setErrors({}); }} className="ml-auto text-[11px] font-bold text-primary/60 hover:text-primary underline">Cancel</button>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-x-4">
+                                {schema.map(field => {
+                                    if (!isFieldVisible(field, formData)) return null;
+                                    const section = FORM_SECTIONS[field.id];
+                                    const isHalf = HALF_WIDTH_FIELDS.has(field.id);
+
+                                    return (
+                                        <React.Fragment key={field.id}>
+                                            {section && (
+                                                <div className={`col-span-2 flex items-center gap-2 mb-3 ${field.id === 'homeOwner' ? 'mt-0' : 'mt-6'}`}>
+                                                    <span className="material-symbols-outlined text-[15px] text-primary">{section.icon}</span>
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">{section.title}</span>
+                                                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+                                                </div>
+                                            )}
+                                            <div className={`${isHalf ? 'col-span-1' : 'col-span-2'} mb-4`}>
+                                                <label className="flex justify-between items-baseline mb-1.5">
+                                                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                                                        {field.label}{field.required && <span className="text-red-400 ml-0.5">*</span>}
+                                                    </span>
+                                                    {errors[field.id] && (
+                                                        <span className="text-[10px] text-red-500 font-bold animate-pulse normal-case">Required</span>
+                                                    )}
+                                                </label>
+                                                {renderInput(field)}
+                                            </div>
+                                        </React.Fragment>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="sticky bottom-0 pt-3 bg-gradient-to-t from-white dark:from-[#1a1d21] via-white/95 dark:via-[#1a1d21]/95 to-transparent pb-5">
                                 <button
                                     onClick={handleSaveAndCopy}
                                     className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-blue-500/30 transition-all hover:scale-[1.01] active:scale-[0.98]"
@@ -852,65 +897,160 @@ const AppointmentMaker: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
                             {filteredAppointments.length === 0 ? (
                                 <div className="h-full flex flex-col items-center justify-center text-slate-400">
                                     <span className="material-symbols-outlined text-6xl mb-4 opacity-20">history_edu</span>
                                     <p>No appointment records found.</p>
                                 </div>
                             ) : (
-                                filteredAppointments.map(record => (
-                                    <div key={record.id} className="group bg-white dark:bg-[#1a1d21] rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md transition-all">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div>
-                                                <h3 className="font-bold text-slate-900 dark:text-white text-lg">{record.formData.homeOwner || 'Unknown Homeowner'}</h3>
-                                                <p className="text-xs text-slate-500">
-                                                    {new Date(record.createdAt).toLocaleString()}
-                                                </p>
-                                            </div>
-                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => {
-                                                    setEditingRecord(record);
-                                                    setFormData(record.formData);
-                                                    setIsEditMode(true);
-                                                    setIsEditModalOpen(true);
-                                                }} className="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors" title="Edit Text">
-                                                    <span className="material-symbols-outlined text-[20px]">edit_note</span>
-                                                </button>
-                                                <button onClick={() => handleDelete(record.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Delete">
-                                                    <span className="material-symbols-outlined text-[20px]">delete</span>
-                                                </button>
+                                filteredAppointments.map(record => {
+                                    const isEditing = isEditMode && editingRecord?.id === record.id;
+                                    // Use live formData when this record is being edited in the form
+                                    const d = isEditing ? formData : record.formData;
+                                    const initials = (d.homeOwner || '?').split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+                                    const engagementNum = parseInt(d.engagementLevel) || 0;
+
+                                    return (
+                                        <div
+                                            key={record.id}
+                                            className={`group relative bg-white dark:bg-[#1a1d21] rounded-xl shadow-sm border transition-all overflow-hidden
+                                                ${isEditing
+                                                    ? 'border-primary ring-2 ring-primary/30 shadow-md shadow-primary/10'
+                                                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-md'
+                                                }`}
+                                        >
+                                            {/* Editing indicator strip */}
+                                            {isEditing && (
+                                                <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary" />
+                                            )}
+
+                                            <div className="p-4">
+                                                {/* Header row */}
+                                                <div className="flex items-start justify-between gap-3 mb-3">
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-black shrink-0 ${isEditing ? 'bg-primary' : 'bg-slate-400 dark:bg-slate-600'}`}>
+                                                            {initials}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <h3 className="font-bold text-slate-900 dark:text-white text-sm leading-tight truncate">
+                                                                {d.homeOwner || 'Unknown Homeowner'}
+                                                                {isEditing && <span className="ml-2 text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">Editing</span>}
+                                                            </h3>
+                                                            <p className="text-[11px] text-slate-400 mt-0.5">{new Date(record.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 shrink-0">
+                                                        {/* Engagement pill */}
+                                                        {engagementNum > 0 && (
+                                                            <span className={`text-[11px] font-black px-2 py-0.5 rounded-full ${engagementNum >= 8 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : engagementNum >= 5 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                                                                {engagementNum}/10
+                                                            </span>
+                                                        )}
+                                                        <button
+                                                            onClick={() => {
+                                                                if (isEditing) {
+                                                                    // Cancel edit mode
+                                                                    setFormData({});
+                                                                    setEditingRecord(null);
+                                                                    setIsEditMode(false);
+                                                                } else {
+                                                                    setEditingRecord(record);
+                                                                    setFormData(record.formData);
+                                                                    setIsEditMode(true);
+                                                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                                                }
+                                                            }}
+                                                            className={`p-1.5 rounded-lg transition-colors ${isEditing ? 'text-primary bg-primary/10 hover:bg-primary/20' : 'text-slate-300 dark:text-slate-600 hover:text-primary hover:bg-primary/5 opacity-0 group-hover:opacity-100'}`}
+                                                            title={isEditing ? 'Cancel edit' : 'Edit in form'}
+                                                        >
+                                                            <span className="material-symbols-outlined text-[18px]">{isEditing ? 'close' : 'edit'}</span>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete(record.id)}
+                                                            className="p-1.5 text-slate-300 dark:text-slate-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                            title="Delete"
+                                                        >
+                                                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Info chips row */}
+                                                <div className="flex flex-wrap gap-1.5 mb-3">
+                                                    {d.appointmentDate && (
+                                                        <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] font-semibold px-2 py-1 rounded-md">
+                                                            <span className="material-symbols-outlined text-[13px] text-slate-400">event</span>
+                                                            {d.appointmentDate}
+                                                        </span>
+                                                    )}
+                                                    {d.appointmentTime && (
+                                                        <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] font-semibold px-2 py-1 rounded-md">
+                                                            <span className="material-symbols-outlined text-[13px] text-slate-400">schedule</span>
+                                                            {d.appointmentTime}
+                                                        </span>
+                                                    )}
+                                                    {d.state && (
+                                                        <span className="inline-flex items-center gap-1 bg-primary/10 text-primary text-[11px] font-bold px-2 py-1 rounded-md">
+                                                            {d.state}
+                                                        </span>
+                                                    )}
+                                                    {d.roofType && (
+                                                        <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[11px] px-2 py-1 rounded-md">
+                                                            {d.roofType}
+                                                        </span>
+                                                    )}
+                                                    {d.insuranceName && (
+                                                        <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[11px] px-2 py-1 rounded-md">
+                                                            {d.insuranceName}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Contact row */}
+                                                <div className="flex items-center gap-4 text-[12px] text-slate-500 dark:text-slate-400 mb-3">
+                                                    {d.phoneNumber && (
+                                                        <span className="flex items-center gap-1">
+                                                            <span className="material-symbols-outlined text-[14px]">call</span>
+                                                            {d.phoneNumber}
+                                                        </span>
+                                                    )}
+                                                    {d.address && (
+                                                        <span className="flex items-center gap-1 truncate">
+                                                            <span className="material-symbols-outlined text-[14px] shrink-0">location_on</span>
+                                                            <span className="truncate">{d.address}</span>
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Footer */}
+                                                <div className="flex gap-2 pt-2.5 border-t border-slate-100 dark:border-slate-800">
+                                                    <button
+                                                        onClick={() => copyToClipboard(isEditing
+                                                            ? generateClipboardText(formData, schema)
+                                                            : record.clipboardSummary)}
+                                                        className="flex-1 py-1.5 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 text-primary font-semibold rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[15px]">content_copy</span>
+                                                        {isEditing ? 'Copy Current' : 'Copy'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingRecord(record);
+                                                            setFormData(record.formData);
+                                                            setIsEditMode(false);
+                                                            setIsEditModalOpen(true);
+                                                        }}
+                                                        className="py-1.5 px-3 bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5"
+                                                        title="Edit raw text"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[15px]">edit_note</span>
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-y-1 gap-x-4 text-sm mb-4">
-                                            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                                                <span className="material-symbols-outlined text-[16px] text-slate-400">call</span>
-                                                {record.formData.phoneNumber || 'N/A'}
-                                            </div>
-                                            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                                                <span className="material-symbols-outlined text-[16px] text-slate-400">location_on</span>
-                                                <span className="truncate">{record.formData.address || 'N/A'} {record.formData.state ? `(${record.formData.state})` : ''}</span>
-                                            </div>
-                                            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                                                <span className="material-symbols-outlined text-[16px] text-slate-400">event</span>
-                                                {record.formData.appointmentDate || 'N/A'}
-                                            </div>
-                                            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                                                <span className="material-symbols-outlined text-[16px] text-slate-400">schedule</span>
-                                                {record.formData.appointmentTime || 'N/A'}
-                                            </div>
-                                        </div>
-                                        <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-                                            <button
-                                                onClick={() => copyToClipboard(record.clipboardSummary)}
-                                                className="w-full py-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-primary font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
-                                            >
-                                                <span className="material-symbols-outlined text-[18px]">content_copy</span>
-                                                Copy Again
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))
+                                    );
+                                })
                             )}
                         </div>
                     </div>

@@ -11,6 +11,7 @@ interface CallbackRecord {
     date: string; // YYYY-MM-DDTHH:MM
     notes: string;
     status: 'Pending' | 'No Answer' | 'Booked' | 'Disqualified';
+    call_attempts: number;
     createdAt: number;
 }
 
@@ -64,6 +65,7 @@ const CallbackManager: React.FC = () => {
     const [callbacks, setCallbacks] = useState<CallbackRecord[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const { user } = useAuth();
+    const [callAttemptsMap, setCallAttemptsMap] = useLocalStorage<Record<string, number>>('rc_call_attempts', {});
 
     const fetchCallbacks = async () => {
         if (!user) return;
@@ -83,6 +85,7 @@ const CallbackManager: React.FC = () => {
             if (data) {
                 setCallbacks(data.map((d: any) => ({
                     ...d,
+                    call_attempts: d.call_attempts ?? 0,
                     createdAt: new Date(d.created_at).getTime()
                 })));
             }
@@ -304,6 +307,42 @@ const CallbackManager: React.FC = () => {
         }
     };
 
+    const handleCallAttempt = async (id: string, clickedIndex: number) => {
+        const current = callAttemptsMap[id] ?? 0;
+
+        // Clicking a checked button deselects back to that index
+        if (clickedIndex < current) {
+            setCallAttemptsMap(prev => ({ ...prev, [id]: clickedIndex }));
+            return;
+        }
+
+        const next = clickedIndex + 1;
+
+        if (next >= 3) {
+            // Third call — show as fully checked briefly, then auto-delete
+            setCallAttemptsMap(prev => ({ ...prev, [id]: 3 }));
+            setTimeout(async () => {
+                setCallbacks(prev => prev.filter(cb => cb.id !== id));
+                setCallAttemptsMap(prev => {
+                    const copy = { ...prev };
+                    delete copy[id];
+                    return copy;
+                });
+                try {
+                    const { error } = await supabase.from('callbacks').delete().eq('id', id);
+                    if (error) throw error;
+                } catch (error) {
+                    console.error('Error auto-deleting after 3rd call attempt:', error);
+                    await fetchCallbacks();
+                }
+            }, 600);
+            return;
+        }
+
+        // Persist to localStorage immediately — no DB dependency
+        setCallAttemptsMap(prev => ({ ...prev, [id]: next }));
+    };
+
     const filteredCallbacks = callbacks.filter(cb =>
         cb.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         cb.phone.includes(searchTerm)
@@ -447,13 +486,14 @@ const CallbackManager: React.FC = () => {
                                             <th className="py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-[250px]">Homeowner Details</th>
                                             <th className="py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-[200px]">Callback Date</th>
                                             <th className="py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Notes</th>
+                                            <th className="py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-[130px]">Calls Made</th>
                                             <th className="py-3 px-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-[50px]"></th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-200 dark:divide-slate-700 bg-white dark:bg-surface-dark">
                                         {filteredCallbacks.length === 0 ? (
                                             <tr>
-                                                <td colSpan={5} className="py-8 text-center text-slate-400 text-sm">
+                                                <td colSpan={6} className="py-8 text-center text-slate-400 text-sm">
                                                     No callbacks found.
                                                 </td>
                                             </tr>
@@ -496,6 +536,37 @@ const CallbackManager: React.FC = () => {
                                                         </td>
                                                         <td className="py-3 px-4">
                                                             <p className="text-sm text-slate-600 dark:text-slate-300 truncate max-w-xs">{cb.notes}</p>
+                                                        </td>
+                                                        <td className="py-3 px-4">
+                                                            <div className="flex items-center gap-1.5" title="Check each time you call. After 3 calls this lead is removed automatically.">
+                                                                {[0, 1, 2].map(i => {
+                                                                    const attempts = callAttemptsMap[cb.id] ?? 0;
+                                                                    const checked = attempts > i;
+                                                                    const isNext = attempts === i;
+                                                                    const isFuture = attempts < i;
+                                                                    return (
+                                                                        <button
+                                                                            key={i}
+                                                                            type="button"
+                                                                            disabled={isFuture}
+                                                                            onClick={() => handleCallAttempt(cb.id, i)}
+                                                                            title={checked ? `Undo call ${i + 1}` : isNext ? `Log call attempt ${i + 1}` : ''}
+                                                                            className={`w-7 h-7 rounded-full flex items-center justify-center transition-all border-2
+                                                                                ${checked
+                                                                                    ? 'bg-emerald-500 border-emerald-500 text-white cursor-pointer hover:bg-red-400 hover:border-red-400'
+                                                                                    : isNext
+                                                                                        ? 'border-primary text-primary hover:bg-primary hover:text-white cursor-pointer'
+                                                                                        : 'border-slate-200 dark:border-slate-700 text-slate-300 dark:text-slate-600 cursor-default'
+                                                                                }`}
+                                                                        >
+                                                                            {checked
+                                                                                ? <span className="material-symbols-outlined text-[14px]">check</span>
+                                                                                : <span className="text-[11px] font-bold">{i + 1}</span>
+                                                                            }
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </div>
                                                         </td>
                                                         <td className="py-3 px-4">
                                                             <div className="flex items-center gap-2">
