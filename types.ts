@@ -1,5 +1,5 @@
 
-export type NavItem = 'script' | 'appt' | 'schedule' | 'callbacks' | 'settings' | 'registry';
+export type NavItem = 'dashboard' | 'script' | 'appt' | 'schedule' | 'callbacks' | 'settings' | 'registry' | 'profile';
 
 export interface QualificationState {
     roofAge: string | null;

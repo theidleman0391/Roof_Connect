@@ -1,7 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Sidebar from '../components/Sidebar';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import { supabase } from '../lib/supabase';
+import { SkeletonRow } from '../components/ui/Skeleton';
+import EmptyState from '../components/ui/EmptyState';
+import Button from '../components/ui/Button';
 
 // --- Types ---
 interface CallbackRecord {
@@ -59,12 +64,13 @@ const convertTo24Hour = (timeStr: string) => {
 };
 
 const CallbackManager: React.FC = () => {
-    const { isAdmin } = useAuth();
+    const { isAdmin, user } = useAuth();
+    const { toast } = useToast();
+    const confirm = useConfirm();
 
     // --- State ---
     const [callbacks, setCallbacks] = useState<CallbackRecord[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const { user } = useAuth();
     const [callAttemptsMap, setCallAttemptsMap] = useLocalStorage<Record<string, number>>('rc_call_attempts', {});
 
     const fetchCallbacks = async () => {
@@ -142,7 +148,7 @@ const CallbackManager: React.FC = () => {
             dueCallbacks.forEach(cb => {
                 const cbDate = new Date(cb.date);
                 const timeString = cbDate.toLocaleString([], { hour: '2-digit', minute: '2-digit' });
-                alert(`📞 Callback Due Soon!\n\nName: ${cb.name}\nPhone: ${cb.phone}\nTime: ${timeString}\n\nPlease call now!`);
+                toast.warning(`${cb.name} at ${cb.phone} · ${timeString}`, 'Callback due soon');
             });
         };
 
@@ -189,12 +195,12 @@ const CallbackManager: React.FC = () => {
         e.preventDefault();
 
         if (!newName || !newPhone || !dateInput) {
-            alert("Please fill in required fields.");
+            toast.warning('Please fill in all required fields.');
             return;
         }
 
         if (!user) {
-            alert("Please log in.");
+            toast.error('You must be logged in.');
             return;
         }
 
@@ -224,6 +230,7 @@ const CallbackManager: React.FC = () => {
                     } : cb));
                     setIsModalOpen(false);
                     setEditingId(null);
+                    toast.success(`Updated callback for ${data.name}`);
                 }
             } else {
                 // Create new callback
@@ -248,11 +255,12 @@ const CallbackManager: React.FC = () => {
                         createdAt: new Date(data.created_at).getTime()
                     }, ...prev]);
                     setIsModalOpen(false);
+                    toast.success(`Callback scheduled for ${data.name}`);
                 }
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving:', error);
-            alert('Failed to save callback');
+            toast.error(error.message || 'Failed to save callback');
         }
     };
 
@@ -274,36 +282,29 @@ const CallbackManager: React.FC = () => {
 
     const handleDelete = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
+        const target = callbacks.find(cb => cb.id === id);
+        const ok = await confirm({
+            title: 'Delete callback?',
+            message: target ? `Delete the callback for ${target.name}? This cannot be undone.` : 'This action cannot be undone.',
+            confirmText: 'Delete',
+            variant: 'danger',
+        });
+        if (!ok) return;
 
-        if (window.confirm("Are you sure you want to delete this callback?")) {
-            // Store the deleted item in case we need to restore it
-            const deletedCallback = callbacks.find(cb => cb.id === id);
-            
-            // Optimistic update - remove from UI immediately
-            setCallbacks(prev => prev.filter(cb => cb.id !== id));
-            
-            try {
-                const { error } = await supabase
-                    .from('callbacks')
-                    .delete()
-                    .eq('id', id);
+        const deletedCallback = target;
+        setCallbacks(prev => prev.filter(cb => cb.id !== id));
 
-                if (error) {
-                    console.error('Delete error:', error);
-                    throw error;
-                }
-                
-                // Refetch after delete to ensure sync
-                await new Promise(resolve => setTimeout(resolve, 300));
-                await fetchCallbacks();
-            } catch (error) {
-                console.error('Error deleting callback:', error);
-                // Restore the item if deletion failed
-                if (deletedCallback) {
-                    setCallbacks(prev => [...prev, deletedCallback]);
-                }
-                alert('Failed to delete callback. Please try again.');
+        try {
+            const { error } = await supabase.from('callbacks').delete().eq('id', id);
+            if (error) throw error;
+            await fetchCallbacks();
+            toast.success('Callback deleted');
+        } catch (error: any) {
+            console.error('Error deleting callback:', error);
+            if (deletedCallback) {
+                setCallbacks(prev => [...prev, deletedCallback]);
             }
+            toast.error(error.message || 'Failed to delete callback');
         }
     };
 
@@ -491,10 +492,25 @@ const CallbackManager: React.FC = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-200 dark:divide-slate-700 bg-white dark:bg-surface-dark">
-                                        {filteredCallbacks.length === 0 ? (
+                                        {isLoading ? (
+                                            Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} columns={6} />)
+                                        ) : filteredCallbacks.length === 0 ? (
                                             <tr>
-                                                <td colSpan={6} className="py-8 text-center text-slate-400 text-sm">
-                                                    No callbacks found.
+                                                <td colSpan={6}>
+                                                    {callbacks.length === 0 ? (
+                                                        <EmptyState
+                                                            icon="phone_callback"
+                                                            title="No callbacks yet"
+                                                            description="Log your first callback to keep track of follow-ups."
+                                                            action={<Button icon="add" onClick={handleAddClick}>Add callback</Button>}
+                                                        />
+                                                    ) : (
+                                                        <EmptyState
+                                                            icon="search_off"
+                                                            title="No matches"
+                                                            description={`No callbacks match "${searchTerm}".`}
+                                                        />
+                                                    )}
                                                 </td>
                                             </tr>
                                         ) : (

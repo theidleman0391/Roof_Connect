@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../lib/supabase';
 
 const Profile: React.FC = () => {
     const { user, updateUser } = useAuth();
+    const { toast } = useToast();
     const [uploading, setUploading] = useState(false);
 
     // Mock Metrics for now - in real app, fetch these
@@ -30,14 +32,13 @@ const Profile: React.FC = () => {
             const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
 
             if (!ALLOWED_MIME_TYPES.includes(file.type) || !ALLOWED_EXTENSIONS.includes(fileExt)) {
-                alert('Only image files (JPG, PNG, GIF, WebP) are allowed.');
+                toast.warning('Only image files (JPG, PNG, GIF, WebP) are allowed.');
                 return;
             }
 
-            // Security: limit file size to 5MB
             const MAX_SIZE = 5 * 1024 * 1024;
             if (file.size > MAX_SIZE) {
-                alert('File size must be under 5MB.');
+                toast.warning('File size must be under 5MB.');
                 return;
             }
 
@@ -51,17 +52,15 @@ const Profile: React.FC = () => {
                 .upload(filePath, file);
 
             if (uploadError) {
-                // If bucket doesn't exist or permissions fail, fallback to alert or handling
-                // For MVP without confirmed storage setup:
-                alert("Upload failed (Storage bucket 'avatars' may not exist). Please use an image URL instead.");
+                toast.error("Upload failed — the 'avatars' storage bucket may not be configured.");
                 throw uploadError;
             }
 
-            // Get URL
             const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
 
             if (data) {
                 await updateUser({ avatar: data.publicUrl });
+                toast.success('Profile photo updated');
             }
 
         } catch (error: any) {
@@ -70,6 +69,8 @@ const Profile: React.FC = () => {
             setUploading(false);
         }
     };
+
+    if (!user) return null;
 
     return (
         <div className="flex h-screen overflow-hidden bg-background-light dark:bg-background-dark text-slate-800 dark:text-white">

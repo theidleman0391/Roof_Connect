@@ -14,10 +14,11 @@ export interface UserProfile {
 interface AuthContextType {
     user: UserProfile | null;
     session: Session | null;
+    loading: boolean;
     updateUser: (data: Partial<UserProfile>) => Promise<void>;
     isAdmin: boolean;
     isAuthenticated: boolean;
-    login: (email: string) => Promise<void>; // Request magic link or just helper
+    login: (email: string) => Promise<void>;
     logout: () => Promise<void>;
 }
 
@@ -29,7 +30,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Get initial session
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
             if (session?.user) {
@@ -39,7 +39,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
         });
 
-        // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
             if (session?.user) {
@@ -84,8 +83,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (!user) return;
 
         try {
-            // Security: only allow safe fields to be updated by the user themselves.
-            // Role and agentId should only be changed server-side by an Admin.
             const updates: Record<string, any> = {};
             if (data.name !== undefined) updates.full_name = data.name;
             if (data.avatar !== undefined) updates.avatar_url = data.avatar;
@@ -97,17 +94,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             if (error) throw error;
 
-            // Only reflect the safe fields locally
             setUser(prev => prev ? { ...prev, name: data.name ?? prev.name, avatar: data.avatar ?? prev.avatar } : null);
         } catch (error) {
             console.error('Error updating profile:', error);
+            throw error;
         }
     };
 
-    const login = async (email: string) => {
-        // Placeholder if we want to trigger magic link from context, 
-        // but typically login is handled in Login.tsx directly via supabase.auth.signInWith...
-        // keeping interface for compatibility if needed.
+    const login = async (_email: string) => {
+        // Reserved for future magic-link flow
     };
 
     const logout = async () => {
@@ -125,8 +120,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const isAuthenticated = !!session;
 
     return (
-        <AuthContext.Provider value={{ user, session, updateUser, isAdmin, isAuthenticated, login, logout }}>
-            {!loading && children}
+        <AuthContext.Provider value={{ user, session, loading, updateUser, isAdmin, isAuthenticated, login, logout }}>
+            {children}
         </AuthContext.Provider>
     );
 };

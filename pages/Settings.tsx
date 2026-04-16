@@ -3,7 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { useToast } from '../contexts/ToastContext';
+import { useConfirm } from '../contexts/ConfirmContext';
 import { supabase } from '../lib/supabase';
+import Icon from '../components/ui/Icon';
+import Button from '../components/ui/Button';
 
 // --- Helper Hook (Supabase integration) ---
 // (removed useLocalStorage)
@@ -11,6 +16,9 @@ import { supabase } from '../lib/supabase';
 const Settings: React.FC = () => {
     const { language, setLanguage, t } = useLanguage();
     const { user, updateUser, logout } = useAuth();
+    const { theme, setTheme } = useTheme();
+    const { toast } = useToast();
+    const confirm = useConfirm();
     const navigate = useNavigate();
 
     // --- State ---
@@ -81,15 +89,23 @@ const Settings: React.FC = () => {
         saveSettings(campaign, newPreferences);
     };
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        const ok = await confirm({
+            title: 'Log out?',
+            message: 'You will need to sign in again to access the CRM.',
+            confirmText: 'Log out',
+            variant: 'danger',
+            icon: 'logout',
+        });
+        if (!ok) return;
         setIsLogoutLoading(true);
-        // Simulate API call
-        setTimeout(async () => {
-            await logout();
-            setIsLogoutLoading(false);
-            navigate('/');
-        }, 1000);
+        await logout();
+        setIsLogoutLoading(false);
+        toast.info('You have been signed out.');
+        navigate('/');
     };
+
+    if (!user) return null;
 
     return (
         <div className="flex h-screen overflow-hidden bg-background-light dark:bg-background-dark text-slate-800 dark:text-white">
@@ -251,6 +267,29 @@ const Settings: React.FC = () => {
                                             className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all ${language === 'es' ? 'bg-white dark:bg-slate-600 shadow-sm text-primary dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}
                                         >
                                             Español
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="h-px bg-slate-100 dark:bg-slate-800"></div>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-bold text-slate-900 dark:text-white">Appearance</span>
+                                        <span className="text-xs text-slate-500">Switch between light and dark mode.</span>
+                                    </div>
+                                    <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                                        <button
+                                            onClick={() => setTheme('light')}
+                                            className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all flex items-center gap-1.5 ${theme === 'light' ? 'bg-white dark:bg-slate-600 shadow-sm text-primary dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}
+                                        >
+                                            <Icon name="light_mode" size={16} />
+                                            Light
+                                        </button>
+                                        <button
+                                            onClick={() => setTheme('dark')}
+                                            className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all flex items-center gap-1.5 ${theme === 'dark' ? 'bg-white dark:bg-slate-600 shadow-sm text-primary dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'}`}
+                                        >
+                                            <Icon name="dark_mode" size={16} />
+                                            Dark
                                         </button>
                                     </div>
                                 </div>
